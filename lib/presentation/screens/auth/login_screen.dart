@@ -1,7 +1,9 @@
 import 'package:chat_app/core/common/custom_button.dart';
 import 'package:chat_app/core/common/custom_text_field.dart';
 import 'package:chat_app/core/utils/validators.dart';
+import 'package:chat_app/data/services/service_locator.dart';
 import 'package:chat_app/presentation/screens/auth/signup_screen.dart';
+import 'package:chat_app/router/app_router.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -110,12 +112,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SignupScreen(),
-                              ),
-                            );
+                            // Navigator.push(
+                            //   context,
+                            //   MaterialPageRoute(
+                            //     builder: (context) => const SignupScreen(),
+                            //   ),
+                            // );
+
+                            //gọi phương thức push của AppRouter để chuyển đến SignupScreen
+                            getIt<AppRouter>().push(const SignupScreen());
                           },
                       ),
                     ],
