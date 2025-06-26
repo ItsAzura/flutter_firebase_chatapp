@@ -1,9 +1,13 @@
 import 'package:chat_app/config/theme/app_theme.dart';
 import 'package:chat_app/presentation/screens/auth/login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:chat_app/firebase_options.dart';
 
 import 'package:flutter/material.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 
