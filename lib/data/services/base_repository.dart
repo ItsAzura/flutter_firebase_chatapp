@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-//Khởi tạo lớp cơ sở cho các repository để sử dụng Firebase Auth và Firestore
+//* Khởi tạo lớp cơ sở cho các repository để sử dụng Firebase Auth và Firestore
 abstract class BaseRepository {
   //tạo instance của FirebaseAuth và FirebaseFirestore
   final FirebaseAuth auth = FirebaseAuth.instance;

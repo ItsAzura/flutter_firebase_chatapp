@@ -1,6 +1,8 @@
 import 'package:chat_app/core/common/custom_button.dart';
 import 'package:chat_app/core/common/custom_text_field.dart';
 import 'package:chat_app/core/utils/validators.dart';
+import 'package:chat_app/data/repositories/auth_repository.dart';
+import 'package:chat_app/data/services/service_locator.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -41,6 +43,38 @@ class _SignupScreenState extends State<SignupScreen> {
     _passwordFocus.dispose();
     _phoneFocus.dispose();
     super.dispose();
+  }
+
+  //* Hàm xử lý đăng ký người dùng mới
+  Future<void> handleSignUp() async {
+    // Bỏ focus ra các trường nhập liệu
+    FocusScope.of(context).unfocus();
+
+    // Kiểm tra tính hợp lệ của form
+    if (_formKey.currentState?.validate() ?? false) {
+      try {
+        // Gọi hàm đăng ký từ AuthRepository thông qua GetIt
+        await getIt<AuthRepository>().signUp(
+          fullName: nameController.text.trim(),
+          username: usernameController.text.trim(),
+          email: emailController.text.trim(),
+          phoneNumber: phoneController.text.trim(),
+          password: passwordController.text.trim(),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    } else {
+      print("Form is not valid");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please fill in all fields correctly"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -122,13 +156,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 const SizedBox(height: 30),
-                CustomButton(
-                  onPressed: () {
-                    FocusScope.of(context).unfocus();
-                    if (_formKey.currentState?.validate() ?? false) {}
-                  },
-                  text: "Create Account",
-                ),
+                CustomButton(onPressed: handleSignUp, text: "Create Account"),
                 const SizedBox(height: 20),
                 Center(
                   child: RichText(
