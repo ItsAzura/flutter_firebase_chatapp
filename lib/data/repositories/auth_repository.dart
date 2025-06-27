@@ -2,8 +2,10 @@ import 'dart:developer';
 
 import 'package:chat_app/data/models/user_model.dart';
 import 'package:chat_app/data/services/base_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AuthRepository extends BaseRepository {
+  Stream<User?> get authStateChanges => auth.authStateChanges();
   //* Hàm đăng ký người dùng mới
   Future<UserModel> signUp({
     required String fullName,
@@ -143,6 +145,11 @@ class AuthRepository extends BaseRepository {
       log("Error during sign in: $e");
       rethrow;
     }
+  }
+
+  //* Hàm đăng xuất
+  Future<void> singOut() async {
+    await auth.signOut();
   }
 
   //* Hàm lấy thông tin người dùng từ Firestore thông qua uid

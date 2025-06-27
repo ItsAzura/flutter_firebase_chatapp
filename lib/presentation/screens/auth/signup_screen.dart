@@ -1,10 +1,15 @@
 import 'package:chat_app/core/common/custom_button.dart';
 import 'package:chat_app/core/common/custom_text_field.dart';
+import 'package:chat_app/core/utils/ui_utils.dart';
 import 'package:chat_app/core/utils/validators.dart';
-import 'package:chat_app/data/repositories/auth_repository.dart';
 import 'package:chat_app/data/services/service_locator.dart';
+import 'package:chat_app/logic/cubits/auth/auth_cubit.dart';
+import 'package:chat_app/logic/cubits/auth/auth_state.dart';
+import 'package:chat_app/presentation/screens/auth/login_screen.dart';
+import 'package:chat_app/router/app_router.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -54,137 +59,189 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_formKey.currentState?.validate() ?? false) {
       try {
         // Gọi hàm đăng ký từ AuthRepository thông qua GetIt
-        await getIt<AuthRepository>().signUp(
+        await getIt<AuthCubit>().signUp(
           fullName: nameController.text.trim(),
           username: usernameController.text.trim(),
           email: emailController.text.trim(),
           phoneNumber: phoneController.text.trim(),
           password: passwordController.text.trim(),
         );
-      } catch (e) {
+
+        // Nếu đăng ký thành công, có thể chuyển hướng hoặc hiển thị thông báo
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("Account created successfully!"),
+            backgroundColor: Colors.green,
+            margin: EdgeInsets.all(16),
+            duration: Duration(seconds: 2),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8.0)),
+            ),
+            behavior: SnackBarBehavior.floating,
+            elevation: 10.0,
+            action: SnackBarAction(
+              label: "OK",
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+      } catch (e) {
+        // Hiển thị thông báo lỗi nếu có
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red,
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8.0)),
+            ),
+            behavior: SnackBarBehavior.floating,
+            elevation: 10.0,
+            action: SnackBarAction(
+              label: "OK",
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
         );
       }
     } else {
-      print("Form is not valid");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please fill in all fields correctly"),
-          backgroundColor: Colors.red,
-        ),
+      UiUtils.showSnackBar(
+        context,
+        message: "Please fill in all fields correctly.",
+        isError: true,
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 30),
-                Text(
-                  "Create Account",
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  "Please fill in the details to continue",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
-                ),
-                const SizedBox(height: 30),
-                CustomTextField(
-                  controller: nameController,
-                  focusNode: _nameFocus,
-                  hintText: "Full Name",
-                  validator: FormValidators.validateName,
-                  prefixIcon: const Icon(Icons.person_outline),
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: usernameController,
-                  hintText: "Username",
-                  focusNode: _usernameFocus,
-                  validator: FormValidators.validateUsername,
-                  prefixIcon: const Icon(Icons.alternate_email),
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: emailController,
-                  hintText: "Email",
-                  focusNode: _emailFocus,
-                  validator: FormValidators.validateEmail,
-                  prefixIcon: const Icon(Icons.email_outlined),
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: phoneController,
-                  focusNode: _phoneFocus,
-                  validator: FormValidators.validatePhone,
-                  hintText: "Phone Number",
-                  prefixIcon: const Icon(Icons.phone_outlined),
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: passwordController,
-                  obscureText: !_isPasswordVisible,
-                  hintText: "Password",
-                  focusNode: _passwordFocus,
-                  suffixIcon: IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                    icon: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+    return BlocConsumer<AuthCubit, AuthState>(
+      bloc: getIt<AuthCubit>(),
+      listener: (context, state) {
+        if (state.status == AuthStatus.authenticated) {
+          getIt<AppRouter>().pushAndRemoveUntil(const LoginScreen());
+        } else if (state.status == AuthStatus.error && state.error != null) {
+          UiUtils.showSnackBar(context, message: state.error!);
+        }
+      },
+      builder: (context, state) {
+        return Scaffold(
+          body: SafeArea(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 30),
+                    Text(
+                      "Create Account",
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  validator: FormValidators.validatePassword,
-                  prefixIcon: const Icon(Icons.lock_outline),
-                ),
-                const SizedBox(height: 30),
-                CustomButton(onPressed: handleSignUp, text: "Create Account"),
-                const SizedBox(height: 20),
-                Center(
-                  child: RichText(
-                    text: TextSpan(
-                      text: "Already have an account?  ",
-                      style: TextStyle(color: Colors.grey[600]),
-                      children: [
-                        TextSpan(
-                          text: "Login",
-                          style: Theme.of(context).textTheme.bodyLarge
-                              ?.copyWith(
-                                color: Theme.of(context).primaryColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                          recognizer: TapGestureRecognizer()
-                            ..onTap = () {
-                              Navigator.pop(context);
-                            },
+                    const SizedBox(height: 10),
+                    Text(
+                      "Please fill in the details to continue",
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 30),
+                    CustomTextField(
+                      controller: nameController,
+                      focusNode: _nameFocus,
+                      hintText: "Full Name",
+                      validator: FormValidators.validateName,
+                      prefixIcon: const Icon(Icons.person_outline),
+                    ),
+                    const SizedBox(height: 16),
+                    CustomTextField(
+                      controller: usernameController,
+                      hintText: "Username",
+                      focusNode: _usernameFocus,
+                      validator: FormValidators.validateUsername,
+                      prefixIcon: const Icon(Icons.alternate_email),
+                    ),
+                    const SizedBox(height: 16),
+                    CustomTextField(
+                      controller: emailController,
+                      hintText: "Email",
+                      focusNode: _emailFocus,
+                      validator: FormValidators.validateEmail,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                    ),
+                    const SizedBox(height: 16),
+                    CustomTextField(
+                      controller: phoneController,
+                      focusNode: _phoneFocus,
+                      validator: FormValidators.validatePhone,
+                      hintText: "Phone Number",
+                      prefixIcon: const Icon(Icons.phone_outlined),
+                    ),
+                    const SizedBox(height: 16),
+                    CustomTextField(
+                      controller: passwordController,
+                      obscureText: !_isPasswordVisible,
+                      hintText: "Password",
+                      focusNode: _passwordFocus,
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
+                        icon: Icon(
+                          _isPasswordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
-                      ],
+                      ),
+                      validator: FormValidators.validatePassword,
+                      prefixIcon: const Icon(Icons.lock_outline),
                     ),
-                  ),
+                    const SizedBox(height: 30),
+                    CustomButton(
+                      onPressed: handleSignUp,
+                      text: "Create Account",
+                    ),
+                    const SizedBox(height: 20),
+                    Center(
+                      child: RichText(
+                        text: TextSpan(
+                          text: "Already have an account?  ",
+                          style: TextStyle(color: Colors.grey[600]),
+                          children: [
+                            TextSpan(
+                              text: "Login",
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  Navigator.pop(context);
+                                },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

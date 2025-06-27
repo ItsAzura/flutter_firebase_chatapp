@@ -1,5 +1,6 @@
 import 'package:chat_app/data/repositories/auth_repository.dart';
 import 'package:chat_app/firebase_options.dart';
+import 'package:chat_app/logic/cubits/auth/auth_cubit.dart';
 import 'package:chat_app/router/app_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -25,4 +26,9 @@ Future<void> setupServiceLocator() async {
 
   //Đăng ký AuthRepository như một singleton trong GetIt để quản lý xác thực người dùng
   getIt.registerLazySingleton(() => AuthRepository());
+
+  //Đăng ký AuthCubit như một singleton trong GetIt để quản lý trạng thái xác thực
+  getIt.registerLazySingleton(
+    () => AuthCubit(authRepository: getIt<AuthRepository>()),
+  );
 }
