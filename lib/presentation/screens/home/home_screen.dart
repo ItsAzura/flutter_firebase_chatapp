@@ -11,7 +11,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Home Screen'),
+        title: const Text('Chat App'),
         actions: [
           InkWell(
             onTap: () async {
@@ -43,6 +43,15 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
       body: const Center(child: Text("User is Authenticator")),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {},
+        elevation: 5.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30.0),
+        ),
+        backgroundColor: Theme.of(context).primaryColor.withOpacity(0.8),
+        child: const Icon(Icons.chat, color: Colors.white, size: 28.0),
+      ),
     );
   }
 }
