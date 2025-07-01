@@ -19,12 +19,13 @@ class ChatRoomModel {
     this.lastMessage,
     this.lastMessageSenderId,
     this.lastMessageTime,
-    this.lastReadTime,
-    this.participantsName,
-    required this.isTyping,
+    Map<String, Timestamp>? lastReadTime,
+    Map<String, String>? participantsName,
+    this.isTyping = false,
     this.typingUserId,
-    required this.isCallActive,
-  });
+    this.isCallActive = false,
+  }) : lastReadTime = lastReadTime ?? {},
+       participantsName = participantsName ?? {};
 
   //tạo object từ Firestore DocumentSnapshot
   factory ChatRoomModel.fromFirestore(DocumentSnapshot doc) {
