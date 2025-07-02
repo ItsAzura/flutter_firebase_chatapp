@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:chat_app/data/repositories/auth_repository.dart';
 import 'package:chat_app/data/services/service_locator.dart';
@@ -98,9 +99,9 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> signOut() async {
     try {
-      print(getIt<AuthRepository>().currentUser?.uid ?? "asasa");
+      log(getIt<AuthRepository>().currentUser?.uid ?? "aaa");
       await _authRepository.singOut();
-      print(getIt<AuthRepository>().currentUser?.uid ?? "asasa");
+      log(getIt<AuthRepository>().currentUser?.uid ?? "aaa");
       emit(state.copyWith(status: AuthStatus.unauthenticated, user: null));
     } catch (e) {
       emit(state.copyWith(status: AuthStatus.error, error: e.toString()));

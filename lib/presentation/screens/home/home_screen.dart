@@ -1,8 +1,13 @@
+import 'dart:developer';
+
+import 'package:chat_app/data/repositories/auth_repository.dart';
+import 'package:chat_app/data/repositories/chat_repository.dart';
 import 'package:chat_app/data/repositories/contact_repository.dart';
 import 'package:chat_app/data/services/service_locator.dart';
 import 'package:chat_app/logic/cubits/auth/auth_cubit.dart';
 import 'package:chat_app/presentation/screens/auth/login_screen.dart';
 import 'package:chat_app/presentation/screens/chat/chat_message_screen.dart';
+import 'package:chat_app/presentation/screens/widgets/chat_list_tile.dart';
 import 'package:chat_app/router/app_router.dart';
 import 'package:flutter/material.dart';
 
@@ -15,10 +20,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final ContactRepository _contactRepository;
+  late final ChatRepository _chatRepository;
+  late final String _currentUserId;
 
   @override
   void initState() {
     _contactRepository = getIt<ContactRepository>();
+    _chatRepository = getIt<ChatRepository>();
+    _currentUserId = getIt<AuthRepository>().currentUser?.uid ?? "";
 
     super.initState();
   }
@@ -119,7 +128,51 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: const Center(child: Text("User is Authenticator")),
+      body: StreamBuilder(
+        stream: _chatRepository.getChatRooms(_currentUserId),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            log("Error fetching chat rooms: ${snapshot.error}");
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final chats = snapshot.data!;
+          if (chats.isEmpty) {
+            return const Center(child: Text("No chats available"));
+          }
+
+          return ListView.builder(
+            itemCount: chats.length,
+            itemBuilder: (context, index) {
+              final chat = chats[index];
+              return ChatListTile(
+                chat: chat,
+                currentUserId: _currentUserId,
+                onTap: () {
+                  final otherUserId = chat.participants.firstWhere(
+                    (id) => id != _currentUserId,
+                  );
+
+                  log("Navigating to chat with user ID: $_currentUserId");
+
+                  final outherUserName =
+                      chat.participantsName?[otherUserId] ?? "Unknown";
+                  getIt<AppRouter>().push(
+                    ChatMessageScreen(
+                      receiverId: otherUserId,
+                      receiverName: outherUserName,
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showContactsList(context),
         elevation: 5.0,

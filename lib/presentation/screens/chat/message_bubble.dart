@@ -1,5 +1,6 @@
 import 'package:chat_app/data/models/chat_message.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -43,19 +44,16 @@ class MessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "4.30 PM",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isMe ? Colors.white70 : Colors.black54,
-                  ),
+                  DateFormat('h:mm a').format(message.timestamp.toDate()),
+                  style: TextStyle(color: isMe ? Colors.white : Colors.black),
                 ),
                 const SizedBox(width: 4),
                 Icon(
                   Icons.done_all,
                   size: 16,
                   color: message.status == MessageStatus.read
-                      ? Colors.black87
-                      : Colors.white70,
+                      ? Colors.white
+                      : Colors.black.withOpacity(0.5),
                 ),
               ],
             ),

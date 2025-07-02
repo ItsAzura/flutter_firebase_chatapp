@@ -1,9 +1,19 @@
+import 'dart:developer';
+
+import 'package:chat_app/data/models/chat_message.dart';
 import 'package:chat_app/data/models/chatroom_model.dart';
+import 'package:chat_app/data/models/user_model.dart';
 import 'package:chat_app/data/services/base_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatRepository extends BaseRepository {
+  //Định nghĩa một collection reference cho các phòng chat
   CollectionReference get _chatRooms => firestore.collection('chatRooms');
+
+  //Hàm lấy tất cả các messages trong một phòng chat
+  CollectionReference getChatRoomMessages(String chatRoomId) {
+    return _chatRooms.doc(chatRoomId).collection("messages");
+  }
 
   //* Hàm để lấy hoặc tạo một phòng chat giữa hai người dùng
   Future<ChatRoomModel> getOrCreateChatRoom(
@@ -65,5 +75,270 @@ class ChatRepository extends BaseRepository {
     //Lưu ChatRoomModel mới vào Firestore
     await _chatRooms.doc(roomId).set(newRoom.toMap());
     return newRoom;
+  }
+
+  Future<void> sendMessage({
+    required String chatRoomId,
+    required String senderId,
+    required String receiverId,
+    required String content,
+    MessageType type = MessageType.text,
+  }) async {
+    //khai báo batch để thực hiện nhiều thao tác ghi dữ liệu trong Firestore
+    final batch = firestore.batch();
+
+    //Lấy reference đến collection messages trong chat room
+    final messageRef = getChatRoomMessages(chatRoomId);
+
+    //tạo doc id mới cho message
+    final messageDoc = messageRef.doc();
+
+    final message = ChatMessage(
+      id: messageDoc.id,
+      chatRoomId: chatRoomId,
+      senderId: senderId,
+      receiverId: receiverId,
+      content: content,
+      type: type,
+      timestamp: Timestamp.now(),
+      readBy: [senderId],
+    );
+
+    //dùng batch để thêm message vào collection messages
+    batch.set(messageDoc, message.toMap());
+
+    //cập nhật lại thông tin của chat room
+    batch.update(_chatRooms.doc(chatRoomId), {
+      "lastMessage": content,
+      "lastMessageSenderId": senderId,
+      "lastMessageTime": message.timestamp,
+    });
+
+    //commit batch để thực hiện các thao tác ghi dữ liệu
+    await batch.commit();
+  }
+
+  //* Hàm để lấy các tin nhắn trong một phòng chat
+  Stream<List<ChatMessage>> getMessages(
+    String chatRoomId, {
+    DocumentSnapshot? lastDocument,
+  }) {
+    if (chatRoomId.isEmpty) {
+      throw Exception('Chat room ID cannot be empty');
+    }
+
+    //lấy collection reference đến các tin nhắn trong phòng chat
+    var query = getChatRoomMessages(chatRoomId)
+        .orderBy('timestamp', descending: true) //tin nhắn mới nhất sẽ ở đầu
+        .limit(20); //giới hạn số lượng tin nhắn lấy về là 20
+
+    //nếu có lastDocument thì bắt đầu từ document đó
+    if (lastDocument != null) {
+      query = query.startAfterDocument(lastDocument);
+    }
+
+    //trả về stream của danh sách tin nhắn
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return ChatMessage.fromFirestore(
+          doc,
+        ); //chuyển đổi DocumentSnapshot thành ChatMessage
+      }).toList();
+    });
+  }
+
+  //* Hàm để lấy thêm tin nhắn trong một phòng chat
+  Future<List<ChatMessage>> getMoreMessages(
+    String chatRoomId, {
+    required DocumentSnapshot lastDocument,
+  }) async {
+    if (chatRoomId.isEmpty) {
+      throw Exception('Chat room ID cannot be empty');
+    }
+
+    //lấy collection reference đến các tin nhắn trong phòng chat
+    final query = getChatRoomMessages(chatRoomId)
+        .orderBy('timestamp', descending: true) //tin nhắn mới nhất sẽ ở đầu
+        .startAfterDocument(lastDocument) //bắt đầu từ document cuối cùng đã lấy
+        .limit(20);
+    log("Loading");
+
+    //lấy snapshot của query
+    final snapshot = await query.get();
+
+    //trả về danh sách các tin nhắn
+    return snapshot.docs.map((doc) => ChatMessage.fromFirestore(doc)).toList();
+  }
+
+  //* Hàm để lấy danh sách các phòng chat của một người dùng
+  Stream<List<ChatRoomModel>> getChatRooms(String userId) {
+    if (userId.isEmpty) {
+      throw Exception('User ID cannot be empty');
+    }
+
+    return _chatRooms
+        .where(
+          "participants",
+          arrayContains: userId,
+        ) //lọc các phòng chat có người dùng tham gia
+        .orderBy(
+          'lastMessageTime',
+          descending: true,
+        ) //sắp xếp theo thời gian tin nhắn cuối cùng
+        .snapshots() //trả về stream của snapshot
+        .map(
+          //chuyển đổi snapshot thành danh sách các ChatRoomModel
+          (snapshot) => snapshot.docs
+              .map((doc) => ChatRoomModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  //* Hàm lấy số lượng tin nhắn chưa đọc trong một phòng chat
+  Stream<int> getUnreadCount(String chatRoomId, String userId) {
+    return getChatRoomMessages(chatRoomId)
+        .where(
+          "receiverId",
+          isEqualTo: userId,
+        ) //lọc các tin nhắn gửi đến người dùng
+        .where(
+          'status',
+          isEqualTo: MessageStatus.sent.toString(),
+        ) //lọc các tin nhắn chưa đọc
+        .snapshots() //trả về stream của snapshot
+        .map(
+          (snapshot) => snapshot.docs.length,
+        ); //trả về số lượng tin nhắn chưa đọc
+  }
+
+  //* Hàm để đánh dấu các tin nhắn là đã đọc trong một phòng chat
+  Future<void> markMessagesAsRead(String chatRoomId, String userId) async {
+    try {
+      // Kiểm tra xem chatRoomId và userId có hợp lệ không
+      if (chatRoomId.isEmpty || userId.isEmpty) {
+        throw Exception('Chat room ID and user ID cannot be empty');
+      }
+
+      //tạo một batch để thực hiện nhiều thao tác ghi dữ liệu
+      final batch = firestore.batch();
+
+      //lấy tất cả các tin nhắn chưa đọc của người dùng trong phòng chat
+      final unreadMessage = await getChatRoomMessages(chatRoomId)
+          .where(
+            "receiverId",
+            isEqualTo: userId,
+          ) //lọc các tin nhắn gửi đến người dùng
+          .where(
+            'status',
+            isEqualTo: MessageStatus.sent.toString(),
+          ) //lọc các tin nhắn chưa đọc
+          .get();
+
+      log("found ${unreadMessage.docs.length} unread messages");
+
+      if (unreadMessage.docs.isEmpty) {
+        log("No unread messages found");
+        return; //nếu không có tin nhắn chưa đọc thì không cần làm gì
+      }
+
+      //vòng lặp qua các tin nhắn chưa đọc và cập nhật trạng thái của chúng
+      for (final doc in unreadMessage.docs) {
+        batch.update(doc.reference, {
+          'status': MessageStatus.read.toString(),
+          'readBy': FieldValue.arrayUnion([userId]),
+        });
+      }
+
+      //gửi lên firestore
+      await batch.commit();
+      log("Marked ${unreadMessage.docs.length} messages as read");
+    } catch (e) {
+      log("Error marking messages as read: $e");
+      throw Exception('Failed to mark messages as read');
+    }
+  }
+
+  Stream<Map<String, dynamic>> getUserOnlineStatus(String userId) {
+    return firestore.collection("users").doc(userId).snapshots().map((
+      snapshot,
+    ) {
+      final data = snapshot.data();
+      return {
+        'isOnline': data?['isOnline'] ?? false,
+        'lastSeen': data?['lastSeen'],
+      };
+    });
+  }
+
+  Future<void> updateOnlineStatus(String userId, bool isOnline) async {
+    await firestore.collection("users").doc(userId).update({
+      'isOnline': isOnline,
+      'lastSeen': Timestamp.now(),
+    });
+  }
+
+  Stream<Map<String, dynamic>> getTypingStatus(String chatRoomId) {
+    return _chatRooms.doc(chatRoomId).snapshots().map((snapshot) {
+      if (!snapshot.exists) {
+        return {'isTyping': false, 'typingUserId': null};
+      }
+      final data = snapshot.data() as Map<String, dynamic>;
+      return {
+        "isTyping": data['isTyping'] ?? false,
+        "typingUserId": data['typingUserId'],
+      };
+    });
+  }
+
+  Future<void> updateTypingStatus(
+    String chatRoomId,
+    String userId,
+    bool isTyping,
+  ) async {
+    try {
+      final doc = await _chatRooms.doc(chatRoomId).get();
+      if (!doc.exists) {
+        log("Chat room does not exist");
+        return;
+      }
+      await _chatRooms.doc(chatRoomId).update({
+        'isTyping': isTyping,
+        'typingUserId': isTyping ? userId : null,
+      });
+    } catch (e) {
+      log("Error updating typing status: $e");
+    }
+  }
+
+  Future<void> blockUser(String currentUserId, String blockedUserId) async {
+    final userRef = firestore.collection("users").doc(currentUserId);
+    await userRef.update({
+      'blockedUsers': FieldValue.arrayUnion([blockedUserId]),
+    });
+  }
+
+  Future<void> unBlockUser(String currentUserId, String blockedUserId) async {
+    final userRef = firestore.collection("users").doc(currentUserId);
+    await userRef.update({
+      'blockedUsers': FieldValue.arrayRemove([blockedUserId]),
+    });
+  }
+
+  Stream<bool> isUserBlocked(String currentUserId, String otherUserId) {
+    return firestore.collection("users").doc(currentUserId).snapshots().map((
+      doc,
+    ) {
+      final userData = UserModel.fromFirestore(doc);
+      return userData.blockedUsers.contains(otherUserId);
+    });
+  }
+
+  Stream<bool> amIBlocked(String currentUserId, String otherUserId) {
+    return firestore.collection("users").doc(otherUserId).snapshots().map((
+      doc,
+    ) {
+      final userData = UserModel.fromFirestore(doc);
+      return userData.blockedUsers.contains(currentUserId);
+    });
   }
 }

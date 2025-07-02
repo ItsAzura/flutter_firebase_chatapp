@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:chat_app/data/models/user_model.dart';
 import 'package:chat_app/data/services/base_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,7 +20,7 @@ class ContactRepository extends BaseRepository {
       // Xin Permission truy cập danh bạ
       bool hasPermission = await requestContactsPermission();
       if (!hasPermission) {
-        print('Contacts permission denied');
+        log('Contacts permission denied');
         return [];
       }
 
@@ -30,7 +32,7 @@ class ContactRepository extends BaseRepository {
 
       // Kiểm tra nếu không có Contact nào
       if (contacts.isEmpty) {
-        print('No contacts found');
+        log('No contacts found');
         return [];
       }
 
@@ -53,7 +55,7 @@ class ContactRepository extends BaseRepository {
       final usersSnapshot = await firestore.collection('users').get();
 
       if (usersSnapshot.docs.isEmpty) {
-        print('No registered users found');
+        log('No registered users found');
         return [];
       }
 
@@ -101,7 +103,7 @@ class ContactRepository extends BaseRepository {
 
       return matchedContacts;
     } catch (e) {
-      print('Error getting registered contacts: $e');
+      log('Error fetching registered contacts: $e');
       return [];
     }
   }

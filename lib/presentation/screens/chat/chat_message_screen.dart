@@ -1,7 +1,15 @@
+import 'dart:io';
+
 import 'package:chat_app/data/models/chat_message.dart';
+import 'package:chat_app/data/services/service_locator.dart';
+import 'package:chat_app/logic/cubits/chat/chat_cubit.dart';
+import 'package:chat_app/logic/cubits/chat/chat_state.dart';
 import 'package:chat_app/presentation/screens/chat/message_bubble.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:chat_app/presentation/screens/widgets/loading_dots.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
 class ChatMessageScreen extends StatefulWidget {
   final String receiverId;
@@ -18,6 +26,78 @@ class ChatMessageScreen extends StatefulWidget {
 
 class _ChatMessageScreenState extends State<ChatMessageScreen> {
   final TextEditingController messageController = TextEditingController();
+  late final ChatCubit _chatCubit;
+  final _scrollController = ScrollController();
+  List<ChatMessage> _previousMessages = [];
+  bool _isComposing = false;
+  bool _showEmoji = false;
+  @override
+  void initState() {
+    _chatCubit = getIt<ChatCubit>();
+    _chatCubit.enterChat(widget.receiverId);
+    messageController.addListener(_onTextChanged);
+    _scrollController.addListener(_onScroll);
+    super.initState();
+  }
+
+  Future<void> _handleSendMessage() async {
+    final messageText = messageController.text.trim();
+    if (messageText.isEmpty) {
+      return;
+    }
+    messageController.clear();
+    await _chatCubit.sendMessage(
+      receiverId: widget.receiverId,
+      content: messageText,
+    );
+  }
+
+  void _onTextChanged() {
+    final isComposing = messageController.text.isNotEmpty;
+    if (isComposing != _isComposing) {
+      setState(() {
+        _isComposing = isComposing;
+      });
+      if (isComposing) {
+        _chatCubit.startTyping();
+      }
+    }
+  }
+
+  void _onScroll() {
+    //load more messages when reaching to top
+
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _chatCubit.loadMoreMessages();
+    }
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _hasNewMessages(List<ChatMessage> messages) {
+    if (messages.length != _previousMessages.length) {
+      _scrollToBottom();
+      _previousMessages = messages;
+    }
+  }
+
+  @override
+  void dispose() {
+    messageController.dispose();
+    _scrollController.dispose();
+    _chatCubit.leaveChat();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,91 +113,272 @@ class _ChatMessageScreenState extends State<ChatMessageScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.receiverName),
-                const Text(
-                  "Online",
-                  style: TextStyle(fontSize: 12, color: Colors.green),
+                BlocBuilder<ChatCubit, ChatState>(
+                  bloc: _chatCubit,
+                  builder: (context, state) {
+                    if (state.isReceiverTyping) {
+                      return Row(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            child: const LoadingDots(),
+                          ),
+                          Text(
+                            "typing",
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    if (state.isReceiverOnline) {
+                      return const Text(
+                        "Online",
+                        style: TextStyle(fontSize: 14, color: Colors.green),
+                      );
+                    }
+                    if (state.receiverLastSeen != null) {
+                      final lastSeen = state.receiverLastSeen!.toDate();
+                      return Text(
+                        "last seen at ${DateFormat('h:mm a').format(lastSeen)}",
+                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      );
+                    }
+
+                    return const SizedBox();
+                  },
                 ),
               ],
             ),
           ],
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Icon(Icons.more_vert, size: 28),
+        actions: [
+          BlocBuilder<ChatCubit, ChatState>(
+            bloc: _chatCubit,
+            builder: (context, state) {
+              if (state.isUserBlocked) {
+                return TextButton.icon(
+                  onPressed: () => _chatCubit.unBlockUser(widget.receiverId),
+                  label: const Text("Unblock"),
+                  icon: const Icon(Icons.block),
+                );
+              }
+              return PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) async {
+                  if (value == "block") {
+                    final bool? confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text(
+                          "Are you sure you want to block ${widget.receiverName}",
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text("Cancel"),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text(
+                              "Block",
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      await _chatCubit.blockUser(widget.receiverId);
+                    }
+                  }
+                },
+                itemBuilder: (context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem(
+                    value: 'block',
+                    child: Text("Block User"),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: 4,
-              itemBuilder: (context, index) {
-                return MessageBubble(
-                  message: ChatMessage(
-                    id: "54356464",
-                    chatRoomId: "5464646",
-                    senderId: "545454564",
-                    receiverId: "45665465465",
-                    content: "first message",
-                    timestamp: Timestamp.now(),
-                    readBy: [],
+      body: BlocConsumer<ChatCubit, ChatState>(
+        listener: (context, state) {
+          _hasNewMessages(state.messages);
+        },
+        bloc: _chatCubit,
+        builder: (context, state) {
+          if (state.status == ChatStatus.loading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (state.status == ChatStatus.error) {
+            return Center(
+              child: Text(
+                state.error ?? "An error occurred",
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
+          }
+          return Column(
+            children: [
+              if (state.amIBlocked)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.red.withOpacity(0.1),
+                  child: Text(
+                    "You have been blocked by ${widget.receiverName}",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.red),
                   ),
-                  isMe: true,
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.emoji_emotions_outlined,
-                      size: 28,
-                      color: Colors.grey,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: messageController,
-                        textCapitalization: TextCapitalization.sentences,
-                        keyboardType: TextInputType.multiline,
-                        decoration: InputDecoration(
-                          hintText: "Type a message",
-                          filled: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                            borderSide: BorderSide.none,
-                          ),
-                          fillColor: Theme.of(
-                            context,
-                          ).primaryColor.withOpacity(0.1),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () {},
-                      icon: const Icon(
-                        Icons.send,
-                        size: 28,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  itemCount: state.messages.length,
+                  itemBuilder: (context, index) {
+                    final message = state.messages[index];
+
+                    final isMe = message.senderId == _chatCubit.currentUserId;
+                    return MessageBubble(message: message, isMe: isMe);
+                  },
+                ),
+              ),
+              if (!state.amIBlocked && !state.isUserBlocked)
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _showEmoji = !_showEmoji;
+                              });
+                              if (_showEmoji) {
+                                FocusScope.of(context).unfocus();
+                              }
+                            },
+                            icon: const Icon(
+                              Icons.emoji_emotions_outlined,
+                              size: 28,
+                              color: Colors.grey,
+                            ),
+                          ),
+
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              onTap: () {
+                                if (_showEmoji) {
+                                  setState(() {
+                                    _showEmoji = false;
+                                  });
+                                }
+                              },
+                              controller: messageController,
+                              textCapitalization: TextCapitalization.sentences,
+                              keyboardType: TextInputType.multiline,
+                              decoration: InputDecoration(
+                                hintText: "Type a message",
+                                filled: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                  borderSide: BorderSide.none,
+                                ),
+                                fillColor: Theme.of(
+                                  context,
+                                ).primaryColor.withOpacity(0.1),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: _isComposing ? _handleSendMessage : null,
+                            icon: Icon(
+                              Icons.send,
+                              size: 28,
+                              color: _isComposing
+                                  ? Theme.of(context).primaryColor
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      if (_showEmoji)
+                        SizedBox(
+                          height: 250,
+                          child: EmojiPicker(
+                            textEditingController: messageController,
+                            onEmojiSelected: (category, emoji) {
+                              messageController
+                                ..text += emoji.emoji
+                                ..selection = TextSelection.fromPosition(
+                                  TextPosition(
+                                    offset: messageController.text.length,
+                                  ),
+                                );
+                              setState(() {
+                                _isComposing =
+                                    messageController.text.isNotEmpty;
+                              });
+                            },
+                            config: Config(
+                              height: 250,
+                              emojiViewConfig: EmojiViewConfig(
+                                columns: 7,
+                                emojiSizeMax:
+                                    32.0 * (Platform.isIOS ? 1.30 : 1.0),
+                                verticalSpacing: 0,
+                                horizontalSpacing: 0,
+                                gridPadding: EdgeInsets.zero,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                loadingIndicator: const SizedBox.shrink(),
+                              ),
+                              categoryViewConfig: const CategoryViewConfig(
+                                initCategory: Category.RECENT,
+                              ),
+                              bottomActionBarConfig: BottomActionBarConfig(
+                                enabled: true,
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                buttonColor: Theme.of(context).primaryColor,
+                              ),
+                              skinToneConfig: const SkinToneConfig(
+                                enabled: true,
+                                dialogBackgroundColor: Colors.white,
+                                indicatorColor: Colors.grey,
+                              ),
+                              searchViewConfig: SearchViewConfig(
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                buttonIconColor: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
