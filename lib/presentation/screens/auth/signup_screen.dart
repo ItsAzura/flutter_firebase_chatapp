@@ -124,10 +124,14 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuthCubit, AuthState>(
       bloc: getIt<AuthCubit>(),
+      // Lắng nghe các thay đổi trạng thái xác thực
       listener: (context, state) {
+        // Nếu trạng thái là authenticated
         if (state.status == AuthStatus.authenticated) {
+          // Hiển thị thông báo thành công
           getIt<AppRouter>().pushAndRemoveUntil(const LoginScreen());
         } else if (state.status == AuthStatus.error && state.error != null) {
+          // Nếu có lỗi, hiển thị thông báo lỗi
           UiUtils.showSnackBar(context, message: state.error!);
         }
       },
@@ -141,20 +145,23 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 32),
                     Text(
                       "Create Account",
                       style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                          ?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onBackground,
+                          ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     Text(
                       "Please fill in the details to continue",
                       style: Theme.of(
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 32),
                     CustomTextField(
                       controller: nameController,
                       focusNode: _nameFocus,
@@ -207,12 +214,12 @@ class _SignupScreenState extends State<SignupScreen> {
                       validator: FormValidators.validatePassword,
                       prefixIcon: const Icon(Icons.lock_outline),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 32),
                     CustomButton(
                       onPressed: handleSignUp,
                       text: "Create Account",
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     Center(
                       child: RichText(
                         text: TextSpan(

@@ -40,10 +40,12 @@ class AuthCubit extends Cubit<AuthState> {
             state.copyWith(status: AuthStatus.authenticated, user: userData),
           );
         } catch (e) {
+          log("Error fetching user data: $e");
           //Nếu có lỗi trong quá trình lấy dữ liệu người dùng, cập nhật trạng thái thành error
           emit(state.copyWith(status: AuthStatus.error, error: e.toString()));
         }
       } else {
+        log("User is unauthenticated");
         //Nếu không có user, cập nhật trạng thái thành unauthenticated
         emit(state.copyWith(status: AuthStatus.unauthenticated, user: null));
       }
@@ -62,9 +64,11 @@ class AuthCubit extends Cubit<AuthState> {
         password: password,
       );
 
+      log("User signed in: ${user.uid}");
       // Cập nhật trạng thái thành authenticated với thông tin người dùng
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
     } catch (e) {
+      log("Error during sign in: $e");
       emit(state.copyWith(status: AuthStatus.error, error: e.toString()));
     }
   }
@@ -90,18 +94,20 @@ class AuthCubit extends Cubit<AuthState> {
         password: password,
       );
 
+      log("User signed up: ${user.uid}");
       // Cập nhật trạng thái thành authenticated với thông tin người dùng
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
     } catch (e) {
+      log("Error during sign up: $e");
       emit(state.copyWith(status: AuthStatus.error, error: e.toString()));
     }
   }
 
   Future<void> signOut() async {
     try {
-      log(getIt<AuthRepository>().currentUser?.uid ?? "aaa");
+      log(getIt<AuthRepository>().currentUser?.uid ?? "user authenticated");
       await _authRepository.singOut();
-      log(getIt<AuthRepository>().currentUser?.uid ?? "aaa");
+      log(getIt<AuthRepository>().currentUser?.uid ?? "user unauthenticated");
       emit(state.copyWith(status: AuthStatus.unauthenticated, user: null));
     } catch (e) {
       emit(state.copyWith(status: AuthStatus.error, error: e.toString()));

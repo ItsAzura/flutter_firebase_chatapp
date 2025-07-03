@@ -106,8 +106,10 @@ class AuthRepository extends BaseRepository {
   //* Hàm lưu thông tin người dùng vào Firestore
   Future<void> saveUserData(UserModel user) async {
     try {
+      //lưu thông tin người dùng vào Firestore
       firestore.collection("users").doc(user.uid).set(user.toMap());
     } catch (e) {
+      log("Error saving user data: $e");
       throw "Failed to save user data";
     }
   }

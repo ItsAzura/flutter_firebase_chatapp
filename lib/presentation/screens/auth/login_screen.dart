@@ -114,90 +114,91 @@ class _LoginScreenState extends State<LoginScreen> {
       },
       builder: (context, state) {
         return Scaffold(
-          body: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 30),
-                  Text(
-                    "Welcome Back",
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+          body: SafeArea(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 32),
+                    Text(
+                      "Welcome Back",
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    "Sign in to continue",
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 30),
-                  CustomTextField(
-                    controller: emailController,
-                    hintText: "Email",
-                    focusNode: _emailFocus,
-                    validator: FormValidators.validateEmail,
-                    prefixIcon: const Icon(Icons.email_outlined),
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: passwordController,
-                    focusNode: _passwordFocus,
-                    validator: FormValidators.validatePassword,
-                    hintText: "Password",
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    obscureText: !_isPasswordVisible,
-                    suffixIcon: IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _isPasswordVisible = !_isPasswordVisible;
-                        });
-                      },
-                      icon: Icon(
-                        _isPasswordVisible
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                    const SizedBox(height: 12),
+                    Text(
+                      "Sign in to continue",
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 32),
+                    CustomTextField(
+                      controller: emailController,
+                      hintText: "Email",
+                      focusNode: _emailFocus,
+                      validator: FormValidators.validateEmail,
+                      prefixIcon: const Icon(Icons.email_outlined),
+                    ),
+                    const SizedBox(height: 16),
+                    CustomTextField(
+                      controller: passwordController,
+                      focusNode: _passwordFocus,
+                      validator: FormValidators.validatePassword,
+                      hintText: "Password",
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      obscureText: !_isPasswordVisible,
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
+                        icon: Icon(
+                          _isPasswordVisible
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  CustomButton(onPressed: handleSignIn, text: 'Login'),
-                  const SizedBox(height: 20),
-                  Center(
-                    child: RichText(
-                      text: TextSpan(
-                        text: "Don't have an account?  ",
-                        style: TextStyle(color: Colors.grey[600]),
-                        children: [
-                          TextSpan(
-                            text: "Sign up",
-                            style: Theme.of(context).textTheme.bodyLarge
-                                ?.copyWith(
-                                  color: Theme.of(context).primaryColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                // Navigator.push(
-                                //   context,
-                                //   MaterialPageRoute(
-                                //     builder: (context) => const SignupScreen(),
-                                //   ),
-                                // );
+                    const SizedBox(height: 32),
+                    CustomButton(onPressed: handleSignIn, text: 'Login'),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: RichText(
+                        text: TextSpan(
+                          text: "Don't have an account?  ",
+                          style: TextStyle(color: Colors.grey[600]),
+                          children: [
+                            TextSpan(
+                              text: "Sign up",
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: Theme.of(context).primaryColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () {
+                                  // Navigator.push(
+                                  //   context,
+                                  //   MaterialPageRoute(
+                                  //     builder: (context) => const SignupScreen(),
+                                  //   ),
+                                  // );
 
-                                //gọi phương thức push của AppRouter để chuyển đến SignupScreen
-                                getIt<AppRouter>().push(const SignupScreen());
-                              },
-                          ),
-                        ],
+                                  //gọi phương thức push của AppRouter để chuyển đến SignupScreen
+                                  getIt<AppRouter>().push(const SignupScreen());
+                                },
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

@@ -57,7 +57,9 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) {
             if (state.status == AuthStatus.initial) {
               return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+                body: Center(
+                  child: CircularProgressIndicator(color: Colors.indigo),
+                ),
               );
             }
             if (state.status == AuthStatus.authenticated) {
