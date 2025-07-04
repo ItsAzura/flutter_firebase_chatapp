@@ -77,13 +77,22 @@ class ChatRepository extends BaseRepository {
     return newRoom;
   }
 
-  Future<void> sendMessage({
+  //* Hàm để gửi một tin nhắn trong một phòng chat
+  Future<bool> sendMessage({
     required String chatRoomId,
     required String senderId,
     required String receiverId,
     required String content,
     MessageType type = MessageType.text,
   }) async {
+    //kiểm tra xem chatRoomId, senderId, receiverId có rỗng hay không
+    if (chatRoomId.isEmpty ||
+        senderId.isEmpty ||
+        receiverId.isEmpty ||
+        content.isEmpty) {
+      return false;
+    }
+
     //khai báo batch để thực hiện nhiều thao tác ghi dữ liệu trong Firestore
     final batch = firestore.batch();
 
@@ -104,6 +113,10 @@ class ChatRepository extends BaseRepository {
       readBy: [senderId],
     );
 
+    if (message.content.isEmpty) {
+      return false;
+    }
+
     //dùng batch để thêm message vào collection messages
     batch.set(messageDoc, message.toMap());
 
@@ -116,6 +129,8 @@ class ChatRepository extends BaseRepository {
 
     //commit batch để thực hiện các thao tác ghi dữ liệu
     await batch.commit();
+
+    return true;
   }
 
   //* Hàm để lấy các tin nhắn trong một phòng chat
@@ -277,12 +292,21 @@ class ChatRepository extends BaseRepository {
     });
   }
 
+  //* Hàm để lấy trạng thái gõ tin nhắn trong một phòng chat
   Stream<Map<String, dynamic>> getTypingStatus(String chatRoomId) {
-    return _chatRooms.doc(chatRoomId).snapshots().map((snapshot) {
+    //trả về stream của trạng thái gõ tin nhắn dạng Map<String, dynamic>
+    return
+    //truy cập vào document của room chat và tạo stream từ snapshots
+    _chatRooms.doc(chatRoomId).snapshots().map((snapshot) {
+      //nếu mà snapshot không tồn tại thì trả về trạng thái không gõ
       if (!snapshot.exists) {
         return {'isTyping': false, 'typingUserId': null};
       }
+
+      //lấy dữ liệu từ snapshot và ép kiểu về Map<String, dynamic>
       final data = snapshot.data() as Map<String, dynamic>;
+
+      //trả về trạng thái gõ tin nhắn
       return {
         "isTyping": data['isTyping'] ?? false,
         "typingUserId": data['typingUserId'],
@@ -290,38 +314,59 @@ class ChatRepository extends BaseRepository {
     });
   }
 
-  Future<void> updateTypingStatus(
+  //* Hàm để cập nhật trạng thái gõ tin nhắn trong một phòng chat
+  Future<bool> updateTypingStatus(
     String chatRoomId,
     String userId,
     bool isTyping,
   ) async {
     try {
+      //lấy document của chat room
       final doc = await _chatRooms.doc(chatRoomId).get();
       if (!doc.exists) {
         log("Chat room does not exist");
-        return;
+        return false;
       }
       await _chatRooms.doc(chatRoomId).update({
         'isTyping': isTyping,
         'typingUserId': isTyping ? userId : null,
       });
+
+      return true;
     } catch (e) {
       log("Error updating typing status: $e");
+      return false;
     }
   }
 
-  Future<void> blockUser(String currentUserId, String blockedUserId) async {
-    final userRef = firestore.collection("users").doc(currentUserId);
-    await userRef.update({
-      'blockedUsers': FieldValue.arrayUnion([blockedUserId]),
-    });
+  Future<bool> blockUser(String currentUserId, String blockedUserId) async {
+    try {
+      final userRef = firestore.collection("users").doc(currentUserId);
+      await userRef.update({
+        'blockedUsers': FieldValue.arrayUnion([blockedUserId]),
+      });
+
+      log("User blocked successfully");
+      return true;
+    } catch (e) {
+      log("Failed to block user: $e");
+      return false;
+    }
   }
 
-  Future<void> unBlockUser(String currentUserId, String blockedUserId) async {
-    final userRef = firestore.collection("users").doc(currentUserId);
-    await userRef.update({
-      'blockedUsers': FieldValue.arrayRemove([blockedUserId]),
-    });
+  Future<bool> unBlockUser(String currentUserId, String blockedUserId) async {
+    try {
+      final userRef = firestore.collection("users").doc(currentUserId);
+      await userRef.update({
+        'blockedUsers': FieldValue.arrayRemove([blockedUserId]),
+      });
+
+      log("User unblocked successfully");
+      return true;
+    } catch (e) {
+      log("Failed to unblock user: $e");
+      return false;
+    }
   }
 
   Stream<bool> isUserBlocked(String currentUserId, String otherUserId) {

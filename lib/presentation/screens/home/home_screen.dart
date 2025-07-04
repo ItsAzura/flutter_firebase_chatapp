@@ -157,8 +157,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     (id) => id != _currentUserId,
                   );
 
-                  log("Navigating to chat with user ID: $_currentUserId");
-
                   final outherUserName =
                       chat.participantsName?[otherUserId] ?? "Unknown";
                   getIt<AppRouter>().push(

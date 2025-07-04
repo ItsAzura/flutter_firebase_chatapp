@@ -79,6 +79,7 @@ class ChatCubit extends Cubit<ChatState> {
   }) async {
     //kiểm tra xem đã có chat room chưa
     if (state.chatRoomId == null) {
+      log("Chat room ID is null");
       return;
     }
 
@@ -90,6 +91,7 @@ class ChatCubit extends Cubit<ChatState> {
           error: 'Receiver ID cannot be empty',
         ),
       );
+      log("Receiver ID is empty");
       return;
     }
 
@@ -101,18 +103,34 @@ class ChatCubit extends Cubit<ChatState> {
           error: 'Message cannot be empty',
         ),
       );
+      log("Message content is empty");
       return;
     }
 
     try {
       //gọi hàm sendMessage từ repository để gửi tin nhắn
-      await _chatRepository.sendMessage(
+      var sendMessage = await _chatRepository.sendMessage(
         chatRoomId: state.chatRoomId!,
         senderId: currentUserId,
         receiverId: receiverId,
         content: content,
       );
+
+      if (sendMessage == false) {
+        emit(
+          state.copyWith(
+            status: ChatStatus.error,
+            error: 'Failed to send message',
+          ),
+        );
+        log("Failed to send message");
+        return;
+      }
+
+      log("Message sent successfully");
     } catch (e) {
+      log("Error sending message: $e");
+
       //nếu có lỗi, emit trạng thái error
       emit(state.copyWith(status: ChatStatus.error, error: e.toString()));
     }
@@ -194,12 +212,17 @@ class ChatCubit extends Cubit<ChatState> {
     _typingSubscription = _chatRepository
         .getTypingStatus(chatRoomId)
         .listen(
+          //lắng nghe trạng thái gõ tin nhắn
           (status) {
+            //có đang typing hay không
             final isTyping = status["isTyping"] as bool;
+
+            //user id
             final typingUserId = status["typingUserId"] as String?;
 
             emit(
               state.copyWith(
+                // Cập nhật trạng thái gõ tin nhắn
                 isReceiverTyping: isTyping && typingUserId != currentUserId,
               ),
             );
@@ -214,11 +237,16 @@ class ChatCubit extends Cubit<ChatState> {
     if (state.chatRoomId == null) return;
 
     try {
-      await _chatRepository.updateTypingStatus(
+      var isUpdated = await _chatRepository.updateTypingStatus(
         state.chatRoomId!,
         currentUserId,
         isTyping,
       );
+
+      if (isUpdated == false) {
+        log("Failed to update typing status");
+        return;
+      }
     } catch (e) {
       log("Error updating typing status: $e");
     }
@@ -235,7 +263,14 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> blockUser(String userId) async {
     try {
-      await _chatRepository.blockUser(currentUserId, userId);
+      var isUserBlocked = await _chatRepository.blockUser(
+        currentUserId,
+        userId,
+      );
+      if (isUserBlocked == false) {
+        emit(state.copyWith(error: 'Failed to block user'));
+        return;
+      }
     } catch (e) {
       emit(state.copyWith(error: 'failed to block user $e'));
     }
@@ -243,7 +278,14 @@ class ChatCubit extends Cubit<ChatState> {
 
   Future<void> unBlockUser(String userId) async {
     try {
-      await _chatRepository.unBlockUser(currentUserId, userId);
+      var isUnblockedUser = await _chatRepository.unBlockUser(
+        currentUserId,
+        userId,
+      );
+      if (isUnblockedUser == false) {
+        emit(state.copyWith(error: 'Failed to unblock user'));
+        return;
+      }
     } catch (e) {
       emit(state.copyWith(error: 'failed to unblock user $e'));
     }
@@ -253,8 +295,9 @@ class ChatCubit extends Cubit<ChatState> {
     if (state.status != ChatStatus.loaded ||
         state.messages.isEmpty ||
         !state.hasMoreMessages ||
-        state.isLoadingMore)
+        state.isLoadingMore) {
       return;
+    }
 
     try {
       emit(state.copyWith(isLoadingMore: true));
@@ -285,7 +328,7 @@ class ChatCubit extends Cubit<ChatState> {
     } catch (e) {
       emit(
         state.copyWith(
-          error: "Failed to laod more messages",
+          error: "Failed to load more messages",
           isLoadingMore: false,
         ),
       );
