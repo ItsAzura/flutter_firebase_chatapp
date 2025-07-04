@@ -181,4 +181,14 @@ class AuthRepository extends BaseRepository {
       rethrow;
     }
   }
+
+  Future<void> updateFcmToken(String uid, String fcmToken) async {
+    try {
+      await firestore.collection("users").doc(uid).update({
+        'fcmToken': fcmToken,
+      });
+    } catch (e) {
+      log("Error updating FCM token: $e");
+    }
+  }
 }

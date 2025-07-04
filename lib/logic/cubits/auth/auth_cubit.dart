@@ -6,6 +6,7 @@ import 'package:chat_app/data/services/service_locator.dart';
 import 'package:chat_app/logic/cubits/auth/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AuthCubit extends Cubit<AuthState> {
   //khởi tạo Authrepository để quản lý xác thực người dùng
@@ -34,6 +35,12 @@ class AuthCubit extends Cubit<AuthState> {
         try {
           //Lấy dữ liệu người dùng từ AuthRepository
           final userData = await _authRepository.getUserData(user.uid);
+
+          // Lấy FCM token và lưu vào Firestore
+          final fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await _authRepository.updateFcmToken(user.uid, fcmToken);
+          }
 
           //Cập nhật trạng thái thành authenticated với thông tin người dùng
           emit(
@@ -67,6 +74,11 @@ class AuthCubit extends Cubit<AuthState> {
       log("User signed in: ${user.uid}");
       // Cập nhật trạng thái thành authenticated với thông tin người dùng
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
+      // Lấy FCM token và lưu vào Firestore
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await _authRepository.updateFcmToken(user.uid, fcmToken);
+      }
     } catch (e) {
       log("Error during sign in: $e");
       emit(state.copyWith(status: AuthStatus.error, error: e.toString()));
@@ -97,6 +109,11 @@ class AuthCubit extends Cubit<AuthState> {
       log("User signed up: ${user.uid}");
       // Cập nhật trạng thái thành authenticated với thông tin người dùng
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
+      // Lấy FCM token và lưu vào Firestore
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await _authRepository.updateFcmToken(user.uid, fcmToken);
+      }
     } catch (e) {
       log("Error during sign up: $e");
       emit(state.copyWith(status: AuthStatus.error, error: e.toString()));
